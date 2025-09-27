@@ -36,8 +36,14 @@
         .app-subtitle {
             font-size: 12px;
             color: #8e8e93;
-            margin-bottom: 30px;
+            margin-bottom: 10px;
             letter-spacing: 0.5px;
+        }
+        
+        .instruction {
+            font-size: 16px;
+            color: #8e8e93;
+            margin-bottom: 30px;
         }
         
         .slider-container {
@@ -46,7 +52,7 @@
             height: 60px;
             background: #2c2c2e;
             border-radius: 30px;
-            margin: 40px auto;
+            margin: 20px auto;
             overflow: hidden;
             border: 1px solid #444;
         }
@@ -55,15 +61,9 @@
             position: absolute;
             width: 100%;
             height: 100%;
-            background: linear-gradient(90deg, #32d74b 0%, #30d158 100%);
+            background: #2c2c2e;
             border-radius: 30px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: white;
-            font-weight: 600;
-            font-size: 18px;
-            letter-spacing: 0.5px;
+            transition: background 0.3s ease;
         }
         
         .slider-handle {
@@ -80,39 +80,22 @@
             cursor: grab;
             z-index: 10;
             box-shadow: 0 2px 10px rgba(0,0,0,0.3);
-            transition: left 0.3s ease;
+            transition: left 0.3s ease, background 0.3s ease, transform 0.3s ease;
+            font-size: 24px;
+            font-weight: bold;
         }
         
         .slider-handle:active {
             cursor: grabbing;
-            transform: scale(1.1);
         }
         
-        .slider-handle::after {
-            content: "→";
-            font-size: 20px;
-            color: #32d74b;
-            font-weight: bold;
-        }
-        
-        .slider-text {
+        .slider-fill {
             position: absolute;
-            width: 100%;
-            text-align: center;
-            color: #fff;
-            font-size: 18px;
-            font-weight: 500;
-            pointer-events: none;
-            z-index: 5;
-        }
-        
-        .notification-preview {
+            height: 100%;
             background: #2c2c2e;
-            padding: 15px;
-            border-radius: 15px;
-            margin: 20px 0;
-            text-align: left;
-            border-left: 3px solid #32d74b;
+            border-radius: 30px;
+            width: 100%;
+            transition: background 0.3s ease;
         }
         
         .status {
@@ -150,15 +133,12 @@
         <div class="app-title">🚪 Knock on my door</div>
         <div class="app-subtitle">by Марк • v1.0.0</div>
         
-        <div class="notification-preview">
-            <strong>Новое уведомление</strong><br>
-            Кто-то постучал в вашу дверь
-        </div>
+        <div class="instruction">Потяните чтобы отправить</div>
         
         <div class="slider-container">
-            <div class="slider-track" id="sliderTrack"></div>
-            <div class="slider-text">Потяните чтобы ответить</div>
-            <div class="slider-handle" id="sliderHandle"></div>
+            <div class="slider-fill" id="sliderFill"></div>
+            <div class="slider-track"></div>
+            <div class="slider-handle" id="sliderHandle">✓</div>
         </div>
         
         <div class="status" id="status">Готов к работе</div>
@@ -173,7 +153,7 @@
         const CHAT_ID = '5926987490';
         
         const sliderHandle = document.getElementById('sliderHandle');
-        const sliderTrack = document.getElementById('sliderTrack');
+        const sliderFill = document.getElementById('sliderFill');
         const status = document.getElementById('status');
         
         let isDragging = false;
@@ -197,6 +177,7 @@
             isDragging = true;
             startX = e.clientX || e.touches[0].clientX;
             sliderHandle.style.transition = 'none';
+            sliderFill.style.transition = 'none';
             status.textContent = "Тяните...";
         }
         
@@ -212,9 +193,29 @@
             
             sliderHandle.style.left = currentX + 'px';
             
-            // Меняем текст при приближении к концу
-            if (currentX > triggerDistance - 50) {
-                status.textContent = "Отпустите чтобы отправить";
+            // Динамическое изменение цвета всей полосы
+            const progress = currentX / triggerDistance;
+            
+            // Меняем цвет всей полосы в зависимости от прогресса
+            if (progress < 0.3) {
+                sliderFill.style.background = 'linear-gradient(90deg, #ff453a 0%, #ff375f 100%)';
+                sliderHandle.style.background = '#ff453a';
+                sliderHandle.style.color = '#fff';
+            } else if (progress < 0.7) {
+                sliderFill.style.background = 'linear-gradient(90deg, #ff9500 0%, #ff9f0a 100%)';
+                sliderHandle.style.background = '#ff9500';
+                sliderHandle.style.color = '#fff';
+            } else {
+                sliderFill.style.background = 'linear-gradient(90deg, #32d74b 0%, #30d158 100%)';
+                sliderHandle.style.background = '#32d74b';
+                sliderHandle.style.color = '#fff';
+            }
+            
+            // Увеличиваем ручку при приближении к концу
+            if (progress > 0.8) {
+                sliderHandle.style.transform = 'scale(1.2)';
+            } else {
+                sliderHandle.style.transform = 'scale(1)';
             }
         }
         
@@ -222,12 +223,16 @@
             if (!isDragging) return;
             isDragging = false;
             
-            sliderHandle.style.transition = 'left 0.3s ease';
+            sliderHandle.style.transition = 'left 0.3s ease, background 0.3s ease, transform 0.3s ease';
+            sliderFill.style.transition = 'background 0.3s ease';
             
             // Проверяем, дотащили ли до конца
             if (currentX >= triggerDistance - 10) {
                 // Успех - отправляем уведомление
                 sliderHandle.style.left = triggerDistance + 'px';
+                sliderFill.style.background = 'linear-gradient(90deg, #32d74b 0%, #30d158 100%)';
+                sliderHandle.style.background = '#32d74b';
+                sliderHandle.style.color = '#fff';
                 status.textContent = "⏳ Отправка...";
                 status.className = "status";
                 
@@ -235,6 +240,10 @@
             } else {
                 // Возвращаем в начало
                 sliderHandle.style.left = '0px';
+                sliderFill.style.background = '#2c2c2e';
+                sliderHandle.style.background = '#fff';
+                sliderHandle.style.color = '#32d74b';
+                sliderHandle.style.transform = 'scale(1)';
                 status.textContent = "Готов к работе";
                 status.className = "status";
             }
@@ -266,12 +275,16 @@ _Отправлено через Knock on my door v1.0.0_`,
                     status.className = "status success";
                     
                     // Анимация успеха
-                    sliderTrack.classList.add('success-animation');
+                    sliderHandle.classList.add('success-animation');
                     setTimeout(() => {
-                        sliderTrack.classList.remove('success-animation');
+                        sliderHandle.classList.remove('success-animation');
                         // Возвращаем слайдер
                         setTimeout(() => {
                             sliderHandle.style.left = '0px';
+                            sliderFill.style.background = '#2c2c2e';
+                            sliderHandle.style.background = '#fff';
+                            sliderHandle.style.color = '#32d74b';
+                            sliderHandle.style.transform = 'scale(1)';
                             status.textContent = "Готов к работе";
                         }, 1000);
                     }, 1000);
@@ -280,11 +293,17 @@ _Отправлено через Knock on my door v1.0.0_`,
                     status.textContent = "❌ Ошибка отправки";
                     status.className = "status error";
                     sliderHandle.style.left = '0px';
+                    sliderFill.style.background = '#2c2c2e';
+                    sliderHandle.style.background = '#fff';
+                    sliderHandle.style.color = '#32d74b';
                 }
             } catch (error) {
                 status.textContent = "❌ Ошибка сети";
                 status.className = "status error";
                 sliderHandle.style.left = '0px';
+                sliderFill.style.background = '#2c2c2e';
+                sliderHandle.style.background = '#fff';
+                sliderHandle.style.color = '#32d74b';
             }
         }
         
