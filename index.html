@@ -1,8 +1,19 @@
 <!DOCTYPE html>
 <html>
 <head>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Knock on my door</title>
     <style>
+        * {
+            -webkit-touch-callout: none;
+            -webkit-user-select: none;
+            -khtml-user-select: none;
+            -moz-user-select: none;
+            -ms-user-select: none;
+            user-select: none;
+            touch-action: pan-y;
+        }
+        
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
             text-align: center;
@@ -18,7 +29,8 @@
         }
         
         .iphone-frame {
-            width: 320px;
+            width: 90%;
+            max-width: 320px;
             background: #1c1c1e;
             border-radius: 40px;
             padding: 60px 20px;
@@ -48,13 +60,14 @@
         
         .slider-container {
             position: relative;
-            width: 280px;
-            height: 60px;
+            width: 100%;
+            height: 80px;
             background: #2c2c2e;
-            border-radius: 30px;
+            border-radius: 40px;
             margin: 20px auto;
             overflow: hidden;
             border: 1px solid #444;
+            touch-action: none;
         }
         
         .slider-track {
@@ -62,16 +75,16 @@
             width: 100%;
             height: 100%;
             background: #2c2c2e;
-            border-radius: 30px;
+            border-radius: 40px;
             transition: background 0.3s ease;
         }
         
         .slider-handle {
             position: absolute;
-            width: 60px;
-            height: 60px;
+            width: 80px;
+            height: 80px;
             background: #fff;
-            border-radius: 30px;
+            border-radius: 40px;
             left: 0;
             top: 0;
             display: flex;
@@ -79,31 +92,47 @@
             justify-content: center;
             cursor: grab;
             z-index: 10;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
             transition: left 0.3s ease, background 0.3s ease, transform 0.3s ease;
-            font-size: 24px;
+            font-size: 32px;
             font-weight: bold;
+            touch-action: none;
         }
         
         .slider-handle:active {
             cursor: grabbing;
+            transform: scale(1.1);
         }
         
         .slider-fill {
             position: absolute;
             height: 100%;
             background: #2c2c2e;
-            border-radius: 30px;
+            border-radius: 40px;
             width: 100%;
             transition: background 0.3s ease;
         }
         
+        .slider-text {
+            position: absolute;
+            width: 100%;
+            text-align: center;
+            color: #fff;
+            font-size: 18px;
+            font-weight: 600;
+            pointer-events: none;
+            z-index: 5;
+            top: 50%;
+            transform: translateY(-50%);
+        }
+        
         .status {
             margin: 20px;
-            padding: 10px;
+            padding: 15px;
             border-radius: 10px;
             background: #2c2c2e;
-            font-size: 14px;
+            font-size: 16px;
+            min-height: 20px;
         }
         
         .success { color: #32d74b; }
@@ -126,6 +155,25 @@
             color: #636366;
             opacity: 0.7;
         }
+
+        /* Адаптация для очень маленьких экранов */
+        @media (max-width: 350px) {
+            .slider-container {
+                height: 70px;
+                border-radius: 35px;
+            }
+            
+            .slider-handle {
+                width: 70px;
+                height: 70px;
+                border-radius: 35px;
+                font-size: 28px;
+            }
+            
+            .iphone-frame {
+                padding: 40px 15px;
+            }
+        }
     </style>
 </head>
 <body>
@@ -139,6 +187,7 @@
             <div class="slider-fill" id="sliderFill"></div>
             <div class="slider-track"></div>
             <div class="slider-handle" id="sliderHandle">✓</div>
+            <div class="slider-text" id="sliderText">Потяните</div>
         </div>
         
         <div class="status" id="status">Готов к работе</div>
@@ -154,28 +203,41 @@
         
         const sliderHandle = document.getElementById('sliderHandle');
         const sliderFill = document.getElementById('sliderFill');
+        const sliderText = document.getElementById('sliderText');
         const status = document.getElementById('status');
         
         let isDragging = false;
         let startX = 0;
         let currentX = 0;
-        const sliderWidth = 280;
-        const handleWidth = 60;
-        const triggerDistance = sliderWidth - handleWidth - 10;
+        let sliderWidth = 0;
+        const handleWidth = 80; // Увеличил размер ручки
+        let triggerDistance = 0;
         
-        // События для мыши
+        // Инициализация размеров после загрузки
+        function initSizes() {
+            const sliderContainer = document.querySelector('.slider-container');
+            sliderWidth = sliderContainer.offsetWidth;
+            triggerDistance = sliderWidth - handleWidth - 10;
+        }
+        
+        // События для тач-устройств (приоритет для мобильных)
+        sliderHandle.addEventListener('touchstart', startDrag, {passive: false});
+        document.addEventListener('touchmove', drag, {passive: false});
+        document.addEventListener('touchend', endDrag);
+        
+        // События для мыши (для десктопа)
         sliderHandle.addEventListener('mousedown', startDrag);
         document.addEventListener('mousemove', drag);
         document.addEventListener('mouseup', endDrag);
         
-        // События для тач-устройств
-        sliderHandle.addEventListener('touchstart', startDrag);
-        document.addEventListener('touchmove', drag);
-        document.addEventListener('touchend', endDrag);
-        
         function startDrag(e) {
+            e.preventDefault();
             isDragging = true;
-            startX = e.clientX || e.touches[0].clientX;
+            
+            // Получаем начальную позицию
+            const clientX = e.clientX || (e.touches && e.touches[0].clientX);
+            startX = clientX;
+            
             sliderHandle.style.transition = 'none';
             sliderFill.style.transition = 'none';
             status.textContent = "Тяните...";
@@ -183,9 +245,12 @@
         
         function drag(e) {
             if (!isDragging) return;
-            
             e.preventDefault();
-            currentX = (e.clientX || e.touches[0].clientX) - startX;
+            
+            const clientX = e.clientX || (e.touches && e.touches[0].clientX);
+            if (!clientX) return;
+            
+            currentX = clientX - startX;
             
             // Ограничиваем движение в пределах слайдера
             if (currentX < 0) currentX = 0;
@@ -193,60 +258,65 @@
             
             sliderHandle.style.left = currentX + 'px';
             
-            // Динамическое изменение цвета всей полосы
+            // Динамическое изменение цвета
             const progress = currentX / triggerDistance;
             
-            // Меняем цвет всей полосы в зависимости от прогресса
+            // Меняем цвет всей полосы
             if (progress < 0.3) {
                 sliderFill.style.background = 'linear-gradient(90deg, #ff453a 0%, #ff375f 100%)';
                 sliderHandle.style.background = '#ff453a';
-                sliderHandle.style.color = '#fff';
+                sliderText.textContent = "Тяните...";
             } else if (progress < 0.7) {
                 sliderFill.style.background = 'linear-gradient(90deg, #ff9500 0%, #ff9f0a 100%)';
                 sliderHandle.style.background = '#ff9500';
-                sliderHandle.style.color = '#fff';
+                sliderText.textContent = "Почти...";
             } else {
                 sliderFill.style.background = 'linear-gradient(90deg, #32d74b 0%, #30d158 100%)';
                 sliderHandle.style.background = '#32d74b';
-                sliderHandle.style.color = '#fff';
+                sliderText.textContent = "Отпустите!";
             }
             
             // Увеличиваем ручку при приближении к концу
             if (progress > 0.8) {
-                sliderHandle.style.transform = 'scale(1.2)';
+                sliderHandle.style.transform = 'scale(1.15)';
             } else {
                 sliderHandle.style.transform = 'scale(1)';
             }
         }
         
-        function endDrag() {
+        function endDrag(e) {
             if (!isDragging) return;
+            e.preventDefault();
+            
             isDragging = false;
             
             sliderHandle.style.transition = 'left 0.3s ease, background 0.3s ease, transform 0.3s ease';
             sliderFill.style.transition = 'background 0.3s ease';
             
             // Проверяем, дотащили ли до конца
-            if (currentX >= triggerDistance - 10) {
+            if (currentX >= triggerDistance - 15) { // Увеличил допуск для удобства
                 // Успех - отправляем уведомление
                 sliderHandle.style.left = triggerDistance + 'px';
                 sliderFill.style.background = 'linear-gradient(90deg, #32d74b 0%, #30d158 100%)';
                 sliderHandle.style.background = '#32d74b';
-                sliderHandle.style.color = '#fff';
+                sliderText.textContent = "Отправка...";
                 status.textContent = "⏳ Отправка...";
-                status.className = "status";
                 
                 sendKnockNotification();
             } else {
                 // Возвращаем в начало
-                sliderHandle.style.left = '0px';
-                sliderFill.style.background = '#2c2c2e';
-                sliderHandle.style.background = '#fff';
-                sliderHandle.style.color = '#32d74b';
-                sliderHandle.style.transform = 'scale(1)';
-                status.textContent = "Готов к работе";
-                status.className = "status";
+                resetSlider();
             }
+        }
+        
+        function resetSlider() {
+            sliderHandle.style.left = '0px';
+            sliderFill.style.background = '#2c2c2e';
+            sliderHandle.style.background = '#fff';
+            sliderHandle.style.color = '#32d74b';
+            sliderHandle.style.transform = 'scale(1)';
+            sliderText.textContent = "Потяните";
+            status.textContent = "Готов к работе";
         }
         
         async function sendKnockNotification() {
@@ -273,41 +343,35 @@ _Отправлено через Knock on my door v1.0.0_`,
                 if (result.ok) {
                     status.textContent = "✅ Уведомление отправлено!";
                     status.className = "status success";
+                    sliderText.textContent = "✅ Отправлено!";
                     
                     // Анимация успеха
                     sliderHandle.classList.add('success-animation');
                     setTimeout(() => {
                         sliderHandle.classList.remove('success-animation');
-                        // Возвращаем слайдер
-                        setTimeout(() => {
-                            sliderHandle.style.left = '0px';
-                            sliderFill.style.background = '#2c2c2e';
-                            sliderHandle.style.background = '#fff';
-                            sliderHandle.style.color = '#32d74b';
-                            sliderHandle.style.transform = 'scale(1)';
-                            status.textContent = "Готов к работе";
-                        }, 1000);
+                        // Возвращаем слайдер через 2 секунды
+                        setTimeout(resetSlider, 2000);
                     }, 1000);
                     
                 } else {
                     status.textContent = "❌ Ошибка отправки";
                     status.className = "status error";
-                    sliderHandle.style.left = '0px';
-                    sliderFill.style.background = '#2c2c2e';
-                    sliderHandle.style.background = '#fff';
-                    sliderHandle.style.color = '#32d74b';
+                    sliderText.textContent = "❌ Ошибка";
+                    setTimeout(resetSlider, 2000);
                 }
             } catch (error) {
                 status.textContent = "❌ Ошибка сети";
                 status.className = "status error";
-                sliderHandle.style.left = '0px';
-                sliderFill.style.background = '#2c2c2e';
-                sliderHandle.style.background = '#fff';
-                sliderHandle.style.color = '#32d74b';
+                sliderText.textContent = "❌ Ошибка";
+                setTimeout(resetSlider, 2000);
             }
         }
         
-        // Запрет контекстного меню
+        // Инициализация при загрузке
+        window.addEventListener('load', initSizes);
+        window.addEventListener('resize', initSizes);
+        
+        // Запрет контекстного меню и масштабирования
         document.addEventListener('contextmenu', e => e.preventDefault());
     </script>
 </body>
