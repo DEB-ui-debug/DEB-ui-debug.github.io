@@ -4,70 +4,209 @@
     <title>Knock on my door</title>
     <style>
         body {
-            font-family: Arial;
+            font-family: Arial, sans-serif;
             text-align: center;
             padding: 50px;
-            background: #667eea;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
+            min-height: 100vh;
+            margin: 0;
         }
+        
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            background: rgba(255, 255, 255, 0.1);
+            padding: 30px;
+            border-radius: 15px;
+            backdrop-filter: blur(10px);
+        }
+        
+        h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+        
+        .subtitle {
+            font-size: 1.2em;
+            margin-bottom: 30px;
+            opacity: 0.9;
+        }
+        
+        .input-group {
+            margin: 20px 0;
+            text-align: left;
+        }
+        
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        
+        input {
+            width: 100%;
+            padding: 12px;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            box-sizing: border-box;
+        }
+        
+        .buttons {
+            margin: 30px 0;
+        }
+        
         button {
-            padding: 20px 40px;
-            font-size: 20px;
+            padding: 15px 30px;
+            font-size: 18px;
             background: #4CAF50;
             color: white;
             border: none;
-            border-radius: 10px;
+            border-radius: 8px;
             margin: 10px;
             cursor: pointer;
+            transition: all 0.3s;
+            border: 2px solid transparent;
         }
-        input {
-            padding: 10px;
-            margin: 5px;
-            width: 300px;
+        
+        button:hover {
+            background: #45a049;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
         }
+        
+        button:active {
+            transform: translateY(0);
+        }
+        
         #status {
-            margin: 20px;
-            padding: 10px;
-            border-radius: 5px;
+            margin: 20px 0;
+            padding: 15px;
+            border-radius: 8px;
+            font-size: 16px;
+            min-height: 20px;
+            transition: all 0.3s;
+        }
+        
+        .success { background: #4CAF50; }
+        .error { background: #f44336; }
+        .info { background: #2196F3; }
+        .warning { background: #ff9800; }
+        
+        .instructions {
+            background: rgba(255,255,255,0.2);
+            padding: 15px;
+            border-radius: 8px;
+            margin: 20px 0;
+            text-align: left;
+            font-size: 14px;
+        }
+        
+        .bot-info {
+            background: rgba(255,255,255,0.15);
+            padding: 15px;
+            border-radius: 8px;
+            margin: 15px 0;
         }
     </style>
 </head>
 <body>
-    <h1>🚪 Knock on my door</h1>
-    
-    <div>
-        <input type="text" id="botToken" placeholder="Токен бота (получить у @BotFather)">
-        <br>
-        <input type="text" id="chatId" placeholder="Ваш Chat ID (число)">
+    <div class="container">
+        <h1>🚪 Knock on my door</h1>
+        <div class="subtitle">Система Telegram-уведомлений</div>
+        
+        <div class="bot-info">
+            <strong>Ваш бот:</strong> в дверь стучат!!! (@KnockOnMyDoorbyDEBBot)
+        </div>
+        
+        <div class="instructions">
+            <strong>Инструкция:</strong>
+            <ol>
+                <li>Введите ваш Chat ID (получите у @userinfobot)</li>
+                <li>Нажмите "Проверить подключение"</li>
+                <li>Если всё OK - используйте кнопку уведомления</li>
+            </ol>
+        </div>
+        
+        <div class="input-group">
+            <label for="chatId">Ваш Chat ID (число):</label>
+            <input type="text" id="chatId" placeholder="Например: 123456789">
+        </div>
+        
+        <input type="hidden" id="botToken" value="8423303857:AAH6fL8w8Qn6BxUoX8zP9wR2StUvW3yZab1">
+        
+        <div class="buttons">
+            <button onclick="testConnection()">🔍 Проверить подключение</button>
+            <button onclick="sendTelegramNotification()">🔔 Постучать в дверь!</button>
+            <button onclick="sendTestMessage()">📋 Тестовое сообщение</button>
+        </div>
+        
+        <div id="status" class="info">
+            Готов к работе! Введите Chat ID и нажмите "Проверить подключение"
+        </div>
+        
+        <div class="instructions">
+            <strong>Статус бота:</strong> ✅ Активен и готов к работе!
+        </div>
     </div>
-    
-    <button onclick="sendTelegramNotification()">🔔 Постучать в дверь (Telegram)</button>
-    <button onclick="testNotification()">📱 Тест браузерного уведомления</button>
-    
-    <div id="status"></div>
 
     <script>
-        // Функция отправки в Telegram
-        async function sendTelegramNotification() {
-            const botToken = document.getElementById('botToken').value;
-            const chatId = document.getElementById('chatId').value;
+        const BOT_TOKEN = '8423303857:AAH6fL8w8Qn6BxUoX8zP9wR2StUvW3yZab1';
+        
+        async function testConnection() {
+            const chatId = document.getElementById('chatId').value.trim();
             
-            if (!botToken || !chatId) {
-                showStatus('❌ Введите токен и chat ID', 'error');
+            if (!chatId) {
+                showStatus('❌ Введите ваш Chat ID', 'error');
+                return;
+            }
+            
+            if (!/^\d+$/.test(chatId)) {
+                showStatus('❌ Chat ID должен содержать только цифры', 'error');
                 return;
             }
             
             try {
-                showStatus('📤 Отправляю уведомление...', 'info');
+                showStatus('🔍 Проверяю подключение к боту...', 'info');
                 
-                const response = await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
+                const response = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/getChat`, {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ chat_id: chatId })
+                });
+                
+                const result = await response.json();
+                
+                if (result.ok) {
+                    showStatus(`✅ Подключение успешно! Бот может писать вам в чат`, 'success');
+                } else {
+                    showStatus(`❌ Ошибка: ${result.description}`, 'error');
+                }
+            } catch (error) {
+                showStatus('❌ Ошибка сети: ' + error.message, 'error');
+            }
+        }
+        
+        async function sendTelegramNotification() {
+            const chatId = document.getElementById('chatId').value.trim();
+            
+            if (!chatId) {
+                showStatus('❌ Введите ваш Chat ID', 'error');
+                return;
+            }
+            
+            try {
+                showStatus('🚪 Стучу в дверь...', 'info');
+                
+                const response = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
                     body: JSON.stringify({
                         chat_id: chatId,
-                        text: '🚪 Кто-то постучал в вашу дверь! Время: ' + new Date().toLocaleTimeString()
+                        text: `🚪🚪🚪\nСТУК-СТУК-СТУК!\nКто-то постучал в вашу дверь!\n\nВремя: ${new Date().toLocaleTimeString()}\nДата: ${new Date().toLocaleDateString()}`,
+                        parse_mode: 'HTML'
                     })
                 });
                 
@@ -75,35 +214,66 @@
                 
                 if (result.ok) {
                     showStatus('✅ Уведомление отправлено в Telegram!', 'success');
+                    
+                    // Браузерное уведомление
+                    if ("Notification" in window && Notification.permission === "granted") {
+                        new Notification("🚪 Knock on my door", {
+                            body: "Уведомление отправлено в Telegram!"
+                        });
+                    }
                 } else {
-                    showStatus('❌ Ошибка отправки: ' + result.description, 'error');
+                    showStatus(`❌ Ошибка отправки: ${result.description}`, 'error');
                 }
             } catch (error) {
-                showStatus('❌ Ошибка: ' + error.message, 'error');
+                showStatus('❌ Ошибка сети: ' + error.message, 'error');
             }
         }
         
-        // Тест браузерных уведомлений
-        function testNotification() {
-            if ("Notification" in window) {
-                Notification.requestPermission().then(permission => {
-                    if (permission === "granted") {
-                        new Notification("🚪 Knock on my door", {
-                            body: "Тестовое уведомление в браузере!"
-                        });
-                        showStatus('✅ Браузерное уведомление отправлено', 'success');
-                    }
+        async function sendTestMessage() {
+            const chatId = document.getElementById('chatId').value.trim();
+            
+            if (!chatId) {
+                showStatus('❌ Введите ваш Chat ID', 'error');
+                return;
+            }
+            
+            try {
+                showStatus('📋 Отправляю тестовое сообщение...', 'info');
+                
+                const response = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        chat_id: chatId,
+                        text: '🔔 <b>Тестовое уведомление</b>\n\nСистема "Knock on my door" работает корректно!\n\nВы получите это сообщение при каждом стуке в дверь.',
+                        parse_mode: 'HTML'
+                    })
                 });
+                
+                const result = await response.json();
+                
+                if (result.ok) {
+                    showStatus('✅ Тестовое сообщение отправлено!', 'success');
+                } else {
+                    showStatus(`❌ Ошибка: ${result.description}`, 'error');
+                }
+            } catch (error) {
+                showStatus('❌ Ошибка сети: ' + error.message, 'error');
             }
         }
         
-        // Показать статус
         function showStatus(message, type) {
             const statusDiv = document.getElementById('status');
             statusDiv.textContent = message;
-            statusDiv.style.backgroundColor = type === 'success' ? '#4CAF50' : 
-                                            type === 'error' ? '#f44336' : '#2196F3';
+            statusDiv.className = type;
         }
+        
+        // Запрос разрешения на уведомления при загрузке
+        window.onload = function() {
+            if ("Notification" in window && Notification.permission === "default") {
+                Notification.requestPermission();
+            }
+        };
     </script>
 </body>
 </html>
