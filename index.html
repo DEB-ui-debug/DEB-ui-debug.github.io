@@ -4,122 +4,292 @@
     <title>Knock on my door</title>
     <style>
         body {
-            font-family: Arial;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
             text-align: center;
-            padding: 50px;
-            background: #667eea;
+            padding: 20px;
+            background: #000;
             color: white;
             min-height: 100vh;
             margin: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
         }
-        .container {
-            max-width: 500px;
-            margin: 0 auto;
-            background: rgba(255,255,255,0.1);
-            padding: 30px;
-            border-radius: 15px;
+        
+        .iphone-frame {
+            width: 320px;
+            background: #1c1c1e;
+            border-radius: 40px;
+            padding: 60px 20px;
+            border: 2px solid #333;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.5);
         }
-        button {
-            padding: 20px 40px;
-            margin: 15px;
-            background: #4CAF50;
+        
+        .app-title {
+            font-size: 24px;
+            font-weight: 600;
+            margin-bottom: 5px;
+            color: #fff;
+        }
+        
+        .app-subtitle {
+            font-size: 12px;
+            color: #8e8e93;
+            margin-bottom: 30px;
+            letter-spacing: 0.5px;
+        }
+        
+        .slider-container {
+            position: relative;
+            width: 280px;
+            height: 60px;
+            background: #2c2c2e;
+            border-radius: 30px;
+            margin: 40px auto;
+            overflow: hidden;
+            border: 1px solid #444;
+        }
+        
+        .slider-track {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, #32d74b 0%, #30d158 100%);
+            border-radius: 30px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
             color: white;
-            border: none;
-            border-radius: 10px;
-            cursor: pointer;
+            font-weight: 600;
+            font-size: 18px;
+            letter-spacing: 0.5px;
+        }
+        
+        .slider-handle {
+            position: absolute;
+            width: 60px;
+            height: 60px;
+            background: #fff;
+            border-radius: 30px;
+            left: 0;
+            top: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: grab;
+            z-index: 10;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+            transition: left 0.3s ease;
+        }
+        
+        .slider-handle:active {
+            cursor: grabbing;
+            transform: scale(1.1);
+        }
+        
+        .slider-handle::after {
+            content: "→";
             font-size: 20px;
-            transition: 0.3s;
+            color: #32d74b;
+            font-weight: bold;
         }
-        button:hover {
-            background: #45a049;
-            transform: scale(1.05);
+        
+        .slider-text {
+            position: absolute;
+            width: 100%;
+            text-align: center;
+            color: #fff;
+            font-size: 18px;
+            font-weight: 500;
+            pointer-events: none;
+            z-index: 5;
         }
-        #status {
-            margin: 20px;
+        
+        .notification-preview {
+            background: #2c2c2e;
             padding: 15px;
-            border-radius: 10px;
-            background: rgba(255,255,255,0.2);
-            font-size: 16px;
-            min-height: 20px;
+            border-radius: 15px;
+            margin: 20px 0;
+            text-align: left;
+            border-left: 3px solid #32d74b;
         }
-        .success { background: #4CAF50; }
+        
+        .status {
+            margin: 20px;
+            padding: 10px;
+            border-radius: 10px;
+            background: #2c2c2e;
+            font-size: 14px;
+        }
+        
+        .success { color: #32d74b; }
+        .error { color: #ff453a; }
+        
+        /* Анимация успеха */
+        @keyframes success {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+            100% { transform: scale(1); }
+        }
+        
+        .success-animation {
+            animation: success 0.5s ease-in-out;
+        }
+        
+        .version-info {
+            margin-top: 30px;
+            font-size: 11px;
+            color: #636366;
+            opacity: 0.7;
+        }
     </style>
 </head>
 <body>
-    <div class="container">
-        <h1>🚪 Knock on my door</h1>
-        <p>Система Telegram-уведомлений</p>
+    <div class="iphone-frame">
+        <div class="app-title">🚪 Knock on my door</div>
+        <div class="app-subtitle">by Марк • v1.0.0</div>
         
-        <button onclick="sendKnock()">🔔 ПОСТУЧАТЬ В ДВЕРЬ</button>
-        <button onclick="testConnection()">🔍 Проверить связь</button>
+        <div class="notification-preview">
+            <strong>Новое уведомление</strong><br>
+            Кто-то постучал в вашу дверь
+        </div>
         
-        <div id="status" class="success">✅ Система готова к работе!</div>
+        <div class="slider-container">
+            <div class="slider-track" id="sliderTrack"></div>
+            <div class="slider-text">Потяните чтобы ответить</div>
+            <div class="slider-handle" id="sliderHandle"></div>
+        </div>
+        
+        <div class="status" id="status">Готов к работе</div>
+        
+        <div class="version-info">
+            Telegram Bot • iOS Style Interface
+        </div>
     </div>
 
     <script>
         const BOT_TOKEN = '8403916552:AAGABjSjpmKVmwOwSnOCZUXkOqIn2-q7WbE';
         const CHAT_ID = '5926987490';
         
-        async function testConnection() {
-            try {
-                showStatus('🔍 Проверяю связь с Telegram...');
-                
-                const response = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({
-                        chat_id: CHAT_ID,
-                        text: '🔗 Проверка связи: Система "Knock on my door" работает корректно!'
-                    })
-                });
-                
-                const result = await response.json();
-                
-                if (result.ok) {
-                    showStatus('✅ Связь отличная! Сообщение доставлено в Telegram');
-                } else {
-                    showStatus('❌ Ошибка связи: ' + result.description);
-                }
-            } catch (error) {
-                showStatus('❌ Ошибка сети: ' + error.message);
+        const sliderHandle = document.getElementById('sliderHandle');
+        const sliderTrack = document.getElementById('sliderTrack');
+        const status = document.getElementById('status');
+        
+        let isDragging = false;
+        let startX = 0;
+        let currentX = 0;
+        const sliderWidth = 280;
+        const handleWidth = 60;
+        const triggerDistance = sliderWidth - handleWidth - 10;
+        
+        // События для мыши
+        sliderHandle.addEventListener('mousedown', startDrag);
+        document.addEventListener('mousemove', drag);
+        document.addEventListener('mouseup', endDrag);
+        
+        // События для тач-устройств
+        sliderHandle.addEventListener('touchstart', startDrag);
+        document.addEventListener('touchmove', drag);
+        document.addEventListener('touchend', endDrag);
+        
+        function startDrag(e) {
+            isDragging = true;
+            startX = e.clientX || e.touches[0].clientX;
+            sliderHandle.style.transition = 'none';
+            status.textContent = "Тяните...";
+        }
+        
+        function drag(e) {
+            if (!isDragging) return;
+            
+            e.preventDefault();
+            currentX = (e.clientX || e.touches[0].clientX) - startX;
+            
+            // Ограничиваем движение в пределах слайдера
+            if (currentX < 0) currentX = 0;
+            if (currentX > triggerDistance) currentX = triggerDistance;
+            
+            sliderHandle.style.left = currentX + 'px';
+            
+            // Меняем текст при приближении к концу
+            if (currentX > triggerDistance - 50) {
+                status.textContent = "Отпустите чтобы отправить";
             }
         }
         
-        async function sendKnock() {
-            try {
-                showStatus('🚪 Стучу в дверь...');
+        function endDrag() {
+            if (!isDragging) return;
+            isDragging = false;
+            
+            sliderHandle.style.transition = 'left 0.3s ease';
+            
+            // Проверяем, дотащили ли до конца
+            if (currentX >= triggerDistance - 10) {
+                // Успех - отправляем уведомление
+                sliderHandle.style.left = triggerDistance + 'px';
+                status.textContent = "⏳ Отправка...";
+                status.className = "status";
                 
+                sendKnockNotification();
+            } else {
+                // Возвращаем в начало
+                sliderHandle.style.left = '0px';
+                status.textContent = "Готов к работе";
+                status.className = "status";
+            }
+        }
+        
+        async function sendKnockNotification() {
+            try {
                 const response = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
                     body: JSON.stringify({
                         chat_id: CHAT_ID,
-                        text: `🚪🚪🚪 ЭКСТРЕННОЕ УВЕДОМЛЕНИЕ 🚪🚪🚪
+                        text: `🚪🚪🚪 УВЕДОМЛЕНИЕ О СТУКЕ 🚪🚪🚪
 
-КТО-ТО СТУЧИТ В ВАШУ ДВЕРЬ!
+👋 Кто-то постучал в вашу дверь!
 
 ⏰ Время: ${new Date().toLocaleTimeString()}
 📅 Дата: ${new Date().toLocaleDateString()}
 
-Срочно проверьте кто там!`
+_Отправлено через Knock on my door v1.0.0_`,
+                        parse_mode: 'Markdown'
                     })
                 });
                 
                 const result = await response.json();
                 
                 if (result.ok) {
-                    showStatus('✅ Уведомление отправлено! Проверьте Telegram');
+                    status.textContent = "✅ Уведомление отправлено!";
+                    status.className = "status success";
+                    
+                    // Анимация успеха
+                    sliderTrack.classList.add('success-animation');
+                    setTimeout(() => {
+                        sliderTrack.classList.remove('success-animation');
+                        // Возвращаем слайдер
+                        setTimeout(() => {
+                            sliderHandle.style.left = '0px';
+                            status.textContent = "Готов к работе";
+                        }, 1000);
+                    }, 1000);
+                    
                 } else {
-                    showStatus('❌ Ошибка отправки: ' + result.description);
+                    status.textContent = "❌ Ошибка отправки";
+                    status.className = "status error";
+                    sliderHandle.style.left = '0px';
                 }
             } catch (error) {
-                showStatus('❌ Ошибка сети');
+                status.textContent = "❌ Ошибка сети";
+                status.className = "status error";
+                sliderHandle.style.left = '0px';
             }
         }
         
-        function showStatus(message) {
-            document.getElementById('status').textContent = message;
-        }
+        // Запрет контекстного меню
+        document.addEventListener('contextmenu', e => e.preventDefault());
     </script>
 </body>
 </html>
