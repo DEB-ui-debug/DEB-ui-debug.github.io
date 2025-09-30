@@ -1,10 +1,15 @@
 <!DOCTYPE html>
-<html>
+<html lang="ru">
 <head>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Knock on my door</title>
     <style>
         * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'SF Pro Display', -apple-system, BlinkMacSystemFont, sans-serif;
             -webkit-touch-callout: none;
             -webkit-user-select: none;
             -khtml-user-select: none;
@@ -15,9 +20,6 @@
         }
         
         body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            text-align: center;
-            padding: 20px;
             background: #000;
             color: white;
             min-height: 100vh;
@@ -26,6 +28,13 @@
             flex-direction: column;
             align-items: center;
             justify-content: center;
+            padding: 20px;
+            transition: all 0.3s ease;
+        }
+
+        body.blocked {
+            pointer-events: none;
+            opacity: 0.3;
         }
         
         .iphone-frame {
@@ -432,7 +441,7 @@
     <div class="blocked-overlay" id="blockedOverlay" style="display: none;">
         <div class="blocked-message">
             <div class="blocked-title">🚫 ЗАБЛОКИРОВАНО</div>
-            <div class="blocked-text">
+            <div class="blocked-text" id="blockedText">
                 Привет, спамер!<br>
                 Система АНТИСПАМ тебя заблокировала!<br><br>
                 Ты отправил слишком много уведомлений за 2 минуты.<br><br>
@@ -447,9 +456,11 @@
     </div>
 
     <script>
+        // Константы
         const BOT_TOKEN = '8403916552:AAGABjSjpmKVmwOwSnOCZUXkOqIn2-q7WbE';
         const CHAT_ID = '5926987490';
         
+        // Элементы DOM
         const sliderHandle = document.getElementById('sliderHandle');
         const sliderFill = document.getElementById('sliderFill');
         const sliderText = document.getElementById('sliderText');
@@ -457,10 +468,12 @@
         const deviceIdElement = document.getElementById('deviceId');
         const spamWarning = document.getElementById('spamWarning');
         const blockedOverlay = document.getElementById('blockedOverlay');
+        const blockedText = document.getElementById('blockedText');
         const codeInput = document.getElementById('codeInput');
         const errorMessage = document.getElementById('errorMessage');
         const whatsNewModal = document.getElementById('whatsNewModal');
         
+        // Переменные
         let isDragging = false;
         let startX = 0;
         let currentX = 0;
@@ -468,47 +481,92 @@
         const handleWidth = 80;
         let triggerDistance = 0;
         let deviceId = '';
+        let blockCheckInterval = null;
         
-        // Настройки антиспама - 2 минуты, 20 попыток
+        // Настройки
         const SPAM_SETTINGS = {
-            maxAttempts: 20,           // 20 попыток
-            timeWindow: 120000,        // за 2 минуты (120 секунд)
-            blockDuration: 3600000,    // блокировка на 1 час
-            cooldown: 2000             // задержка 2 секунды между отправками
+            maxAttempts: 20,
+            timeWindow: 120000,
+            restoreTime: 600000,
+            blockDuration: 3600000,
+            cooldown: 2000
         };
 
-        // Показать "Что нового"
+        // === БАЗОВЫЕ ФУНКЦИИ ===
+
+        function initDatabase() {
+            if (!localStorage.getItem('knock_users_db')) {
+                localStorage.setItem('knock_users_db', JSON.stringify({}));
+            }
+        }
+
         function showWhatsNew() {
             whatsNewModal.style.display = 'flex';
         }
 
-        // Закрыть "Что нового"
         function closeWhatsNew() {
             whatsNewModal.style.display = 'none';
         }
 
-        // Генерация 5-значного кода
         function generateUnlockCode() {
             return Math.floor(10000 + Math.random() * 90000).toString();
         }
 
-        // Проверка на спам (более 20 уведомлений за 2 минуты)
+        function getDeviceType() {
+            const ua = navigator.userAgent;
+            if (/Mobile|Android|iP(hone|od)|IEMobile|BlackBerry/.test(ua)) {
+                return 'Мобильное';
+            } else if (/Tablet|iPad/.test(ua)) {
+                return 'Планшет';
+            } else {
+                return 'Компьютер';
+            }
+        }
+
+        // === СИСТЕМА БЛОКИРОВКИ ===
+
+        function isUserBlockedByDeveloper() {
+            try {
+                const users = JSON.parse(localStorage.getItem('knock_users_db') || '{}');
+                const userData = users[deviceId];
+                return !!(userData && userData.blocked && userData.isPermanentBan);
+            } catch (error) {
+                return false;
+            }
+        }
+
+        function applyDeveloperBlock() {
+            document.body.classList.add('blocked');
+            blockedText.innerHTML = `
+                🔥 Ну все доигрался ЭТО БАН!<br><br>
+                Тебя забанил разработчик!<br>
+                Все вопросы к нему.<br><br>
+                Разблокировка только через панель управления.
+            `;
+            blockedOverlay.style.display = 'flex';
+            status.textContent = "🚫 ЗАБАНЕН РАЗРАБОТЧИКОМ";
+            isDragging = false;
+            resetSlider();
+        }
+
+        function startBlockChecker() {
+            blockCheckInterval = setInterval(() => {
+                if (isUserBlockedByDeveloper()) {
+                    applyDeveloperBlock();
+                    clearInterval(blockCheckInterval);
+                }
+            }, 100);
+        }
+
+        // === СИСТЕМА АНТИСПАМА ===
+
         function checkSpam() {
             const now = Date.now();
             const attempts = JSON.parse(localStorage.getItem('knock_attempts') || '[]');
-            
-            // Удаляем старые попытки (старше 2 минут)
             const recentAttempts = attempts.filter(time => now - time < SPAM_SETTINGS.timeWindow);
-            
-            // Проверяем лимит
-            if (recentAttempts.length >= SPAM_SETTINGS.maxAttempts) {
-                return true;
-            }
-            
-            return false;
+            return recentAttempts.length >= SPAM_SETTINGS.maxAttempts;
         }
 
-        // Добавление попытки
         function addAttempt() {
             const now = Date.now();
             let attempts = JSON.parse(localStorage.getItem('knock_attempts') || '[]');
@@ -517,10 +575,16 @@
             updateAttemptsCounter();
         }
 
-        // Обновление счетчика попыток
         function updateAttemptsCounter() {
             const now = Date.now();
-            const attempts = JSON.parse(localStorage.getItem('knock_attempts') || '[]');
+            let attempts = JSON.parse(localStorage.getItem('knock_attempts') || '[]');
+            const validAttempts = attempts.filter(time => now - time < SPAM_SETTINGS.restoreTime);
+            
+            if (validAttempts.length !== attempts.length) {
+                attempts = validAttempts;
+                localStorage.setItem('knock_attempts', JSON.stringify(attempts));
+            }
+            
             const recentAttempts = attempts.filter(time => now - time < SPAM_SETTINGS.timeWindow);
             const remaining = SPAM_SETTINGS.maxAttempts - recentAttempts.length;
             
@@ -535,8 +599,7 @@
             }
         }
 
-        // Блокировка пользователя
-        function blockUser() {
+        function blockUserForSpam() {
             const unlockCode = generateUnlockCode();
             const blockUntil = Date.now() + SPAM_SETTINGS.blockDuration;
             
@@ -544,29 +607,44 @@
             localStorage.setItem('knock_block_until', blockUntil.toString());
             localStorage.setItem('knock_unlock_code', unlockCode);
             
+            document.body.classList.remove('blocked');
+            blockedText.innerHTML = `
+                Привет, спамер!<br>
+                Система АНТИСПАМ тебя заблокировала!<br><br>
+                Ты отправил слишком много уведомлений за 2 минуты.<br><br>
+                Попроси у создателя код разблокировки:
+            `;
             blockedOverlay.style.display = 'flex';
             
-            // Фокус на поле ввода
             setTimeout(() => {
                 codeInput.focus();
             }, 500);
             
-            // Отправляем код создателю в Telegram
             sendBlockNotification(unlockCode);
         }
 
-        // Проверка блокировки
         function checkBlocked() {
+            if (isUserBlockedByDeveloper()) {
+                applyDeveloperBlock();
+                return true;
+            }
+            
             const blocked = localStorage.getItem('knock_blocked');
             const blockUntil = localStorage.getItem('knock_block_until');
             
             if (blocked && blockUntil) {
                 const now = Date.now();
                 if (now < parseInt(blockUntil)) {
+                    document.body.classList.remove('blocked');
+                    blockedText.innerHTML = `
+                        Привет, спамер!<br>
+                        Система АНТИСПАМ тебя заблокировала!<br><br>
+                        Ты отправил слишком много уведомлений за 2 минуты.<br><br>
+                        Попроси у создателя код разблокировки:
+                    `;
                     blockedOverlay.style.display = 'flex';
                     return true;
                 } else {
-                    // Авторазблокировка по времени
                     unblockUser();
                     return false;
                 }
@@ -574,7 +652,6 @@
             return false;
         }
 
-        // Разблокировка пользователя
         function unblockUser() {
             localStorage.removeItem('knock_blocked');
             localStorage.removeItem('knock_block_until');
@@ -583,53 +660,182 @@
             blockedOverlay.style.display = 'none';
             codeInput.value = '';
             errorMessage.textContent = '';
-            
-            // Обновляем счетчик
+            document.body.classList.remove('blocked');
             updateAttemptsCounter();
-            
-            // Отправляем уведомление о разблокировке
             sendUnblockNotification();
         }
 
-        // Проверка кода разблокировки
         function checkUnlockCode() {
             const enteredCode = codeInput.value.trim();
             const correctCode = localStorage.getItem('knock_unlock_code');
             
             if (enteredCode === correctCode) {
-                // Правильный код
                 unblockUser();
             } else {
-                // Неправильный код
                 errorMessage.textContent = '❌ Неверный код! Попробуйте снова';
                 codeInput.value = '';
                 codeInput.focus();
-                
-                // Анимация ошибки
                 codeInput.classList.add('shake-animation');
                 setTimeout(() => {
                     codeInput.classList.remove('shake-animation');
                 }, 500);
-                
-                // Отправляем уведомление о неудачной попытке
                 sendFailedUnlockAttempt(enteredCode);
             }
         }
 
-        // Обработка нажатия Enter в поле ввода
-        codeInput.addEventListener('keypress', function(e) {
-            if (e.key === 'Enter') {
-                checkUnlockCode();
+        // === УПРАВЛЕНИЕ СЛАЙДЕРОМ ===
+
+        function initSizes() {
+            const sliderContainer = document.querySelector('.slider-container');
+            sliderWidth = sliderContainer.offsetWidth;
+            triggerDistance = sliderWidth - handleWidth - 10;
+        }
+
+        function resetSlider() {
+            sliderHandle.style.left = '0px';
+            sliderFill.style.background = '#2c2c2e';
+            sliderHandle.style.background = '#fff';
+            sliderHandle.style.color = '#32d74b';
+            sliderHandle.style.transform = 'scale(1)';
+            sliderText.textContent = "Потяните";
+            if (!checkBlocked()) {
+                status.textContent = "Готов к работе";
             }
-        });
+        }
 
-        // Ограничение ввода только цифр
-        codeInput.addEventListener('input', function(e) {
-            this.value = this.value.replace(/[^0-9]/g, '');
-            errorMessage.textContent = '';
-        });
+        function startDrag(e) {
+            if (checkBlocked()) return;
+            
+            e.preventDefault();
+            isDragging = true;
+            
+            const clientX = e.clientX || (e.touches && e.touches[0].clientX);
+            startX = clientX;
+            
+            sliderHandle.style.transition = 'none';
+            sliderFill.style.transition = 'none';
+            status.textContent = "Тяните...";
+        }
 
-        // Отправка уведомления о блокировке (только создателю)
+        function drag(e) {
+            if (!isDragging || checkBlocked()) return;
+            e.preventDefault();
+            
+            const clientX = e.clientX || (e.touches && e.touches[0].clientX);
+            if (!clientX) return;
+            
+            currentX = clientX - startX;
+            if (currentX < 0) currentX = 0;
+            if (currentX > triggerDistance) currentX = triggerDistance;
+            
+            sliderHandle.style.left = currentX + 'px';
+            const progress = currentX / triggerDistance;
+            
+            if (progress < 0.3) {
+                sliderFill.style.background = 'linear-gradient(90deg, #ff453a 0%, #ff375f 100%)';
+                sliderHandle.style.background = '#ff453a';
+                sliderText.textContent = "Тяните...";
+            } else if (progress < 0.7) {
+                sliderFill.style.background = 'linear-gradient(90deg, #ff9500 0%, #ff9f0a 100%)';
+                sliderHandle.style.background = '#ff9500';
+                sliderText.textContent = "Почти...";
+            } else {
+                sliderFill.style.background = 'linear-gradient(90deg, #32d74b 0%, #30d158 100%)';
+                sliderHandle.style.background = '#32d74b';
+                sliderText.textContent = "Отпустите!";
+            }
+            
+            if (progress > 0.8) {
+                sliderHandle.style.transform = 'scale(1.15)';
+            } else {
+                sliderHandle.style.transform = 'scale(1)';
+            }
+        }
+
+        function endDrag(e) {
+            if (!isDragging || checkBlocked()) return;
+            e.preventDefault();
+            
+            isDragging = false;
+            sliderHandle.style.transition = 'left 0.3s ease, background 0.3s ease, transform 0.3s ease';
+            sliderFill.style.transition = 'background 0.3s ease';
+            
+            if (currentX >= triggerDistance - 15) {
+                if (checkSpam()) {
+                    blockUserForSpam();
+                    status.textContent = "❌ Слишком часто! Заблокировано";
+                    status.className = "status error";
+                    sliderText.textContent = "❌ Заблокировано";
+                    sliderHandle.classList.add('shake-animation');
+                    setTimeout(() => {
+                        sliderHandle.classList.remove('shake-animation');
+                        resetSlider();
+                    }, 1000);
+                    return;
+                }
+                
+                addAttempt();
+                sliderHandle.style.left = triggerDistance + 'px';
+                sliderFill.style.background = 'linear-gradient(90deg, #32d74b 0%, #30d158 100%)';
+                sliderHandle.style.background = '#32d74b';
+                sliderText.textContent = "Отправка...";
+                status.textContent = "⏳ Отправка...";
+                
+                sendKnockNotification();
+            } else {
+                resetSlider();
+            }
+        }
+
+        // === TELEGRAM УВЕДОМЛЕНИЯ ===
+
+        async function sendKnockNotification() {
+            try {
+                const knockCount = getKnockCount();
+                const response = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        chat_id: CHAT_ID,
+                        text: `🚪🚪🚪 УВЕДОМЛЕНИЕ О СТУКЕ 🚪🚪🚪
+
+👋 Кто-то постучал в вашу дверь!
+
+🆔 С устройства: ${deviceId}
+📱 Тип: ${getDeviceType()}
+⏰ Время: ${new Date().toLocaleTimeString()}
+📅 Дата: ${new Date().toLocaleDateString()}
+📈 Всего стуков: ${knockCount}
+
+_Отправлено через Knock on my door v1.0.1_`,
+                        parse_mode: 'Markdown'
+                    })
+                });
+                
+                const result = await response.json();
+                
+                if (result.ok) {
+                    status.textContent = "✅ Уведомление отправлено!";
+                    status.className = "status success";
+                    sliderText.textContent = "✅ Отправлено!";
+                    
+                    sliderHandle.classList.add('success-animation');
+                    setTimeout(() => {
+                        sliderHandle.classList.remove('success-animation');
+                        setTimeout(resetSlider, 2000);
+                    }, 1000);
+                    
+                } else {
+                    throw new Error('Telegram API error');
+                }
+            } catch (error) {
+                status.textContent = "❌ Ошибка отправки";
+                status.className = "status error";
+                sliderText.textContent = "❌ Ошибка";
+                setTimeout(resetSlider, 2000);
+            }
+        }
+
         async function sendBlockNotification(unlockCode) {
             try {
                 await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
@@ -637,7 +843,7 @@
                     headers: {'Content-Type': 'application/json'},
                     body: JSON.stringify({
                         chat_id: CHAT_ID,
-                        text: `🚫 СПАМ-БЛОКИРОВКА АКТИВИРОВАНА!
+                        text: `🚫 АВТОМАТИЧЕСКАЯ БЛОКИРОВКА
 
 🆔 ID устройства: ${deviceId}
 📱 Тип: ${getDeviceType()}
@@ -654,7 +860,6 @@ _Протокол МПБ: Заблокировано за спам_`,
             }
         }
 
-        // Отправка уведомления о разблокировке
         async function sendUnblockNotification() {
             try {
                 await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
@@ -678,7 +883,6 @@ _Пользователь ввел правильный код_`,
             }
         }
 
-        // Отправка уведомления о неудачной попытке разблокировки
         async function sendFailedUnlockAttempt(enteredCode) {
             try {
                 await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
@@ -704,26 +908,50 @@ _Кто-то пытается угадать код!_`,
             }
         }
 
-        // Остальные функции остаются без изменений
+        async function sendNewDeviceNotification(deviceId) {
+            try {
+                await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        chat_id: CHAT_ID,
+                        text: `📱 НОВОЕ УСТРОЙСТВО
+
+🆔 ID: ${deviceId}
+📱 Тип: ${getDeviceType()}
+⏰ Время: ${new Date().toLocaleString()}
+📍 Источник: Knock App
+
+_Новое устройство зарегистрировано в системе_`,
+                        parse_mode: 'Markdown'
+                    })
+                });
+            } catch (error) {
+                console.log('Ошибка отправки уведомления о новом устройстве');
+            }
+        }
+
+        // === ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ===
+
         function generateDeviceId() {
             let id = localStorage.getItem('knock_device_id');
             if (!id) {
                 id = 'DEV_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
                 localStorage.setItem('knock_device_id', id);
                 sendNewDeviceNotification(id);
+                
+                const users = JSON.parse(localStorage.getItem('knock_users_db') || '{}');
+                if (!users[id]) {
+                    users[id] = {
+                        registered: Date.now(),
+                        knockCount: 0,
+                        deviceType: getDeviceType(),
+                        lastActivity: Date.now()
+                    };
+                    localStorage.setItem('knock_users_db', JSON.stringify(users));
+                }
             }
             return id;
-        }
-
-        function getDeviceType() {
-            const ua = navigator.userAgent;
-            if (/Mobile|Android|iP(hone|od)|IEMobile|BlackBerry/.test(ua)) {
-                return 'Мобильное';
-            } else if (/Tablet|iPad/.test(ua)) {
-                return 'Планшет';
-            } else {
-                return 'Компьютер';
-            }
         }
 
         function getKnockCount() {
@@ -731,188 +959,61 @@ _Кто-то пытается угадать код!_`,
             if (!count) count = 0;
             count = parseInt(count) + 1;
             localStorage.setItem('knock_count', count);
+            
+            const users = JSON.parse(localStorage.getItem('knock_users_db') || '{}');
+            if (users[deviceId]) {
+                users[deviceId].knockCount = (users[deviceId].knockCount || 0) + 1;
+                users[deviceId].lastActivity = Date.now();
+                localStorage.setItem('knock_users_db', JSON.stringify(users));
+            }
+            
             return count;
         }
 
-        // Инициализация размеров после загрузки
-        function initSizes() {
-            const sliderContainer = document.querySelector('.slider-container');
-            sliderWidth = sliderContainer.offsetWidth;
-            triggerDistance = sliderWidth - handleWidth - 10;
-        }
-        
-        // События для тач-устройств
-        sliderHandle.addEventListener('touchstart', startDrag, {passive: false});
-        document.addEventListener('touchmove', drag, {passive: false});
-        document.addEventListener('touchend', endDrag);
-        
-        // События для мыши
-        sliderHandle.addEventListener('mousedown', startDrag);
-        document.addEventListener('mousemove', drag);
-        document.addEventListener('mouseup', endDrag);
-        
-        function startDrag(e) {
-            if (checkBlocked()) return;
-            
-            e.preventDefault();
-            isDragging = true;
-            
-            const clientX = e.clientX || (e.touches && e.touches[0].clientX);
-            startX = clientX;
-            
-            sliderHandle.style.transition = 'none';
-            sliderFill.style.transition = 'none';
-            status.textContent = "Тяните...";
-        }
-        
-        function drag(e) {
-            if (!isDragging || checkBlocked()) return;
-            e.preventDefault();
-            
-            const clientX = e.clientX || (e.touches && e.touches[0].clientX);
-            if (!clientX) return;
-            
-            currentX = clientX - startX;
-            
-            if (currentX < 0) currentX = 0;
-            if (currentX > triggerDistance) currentX = triggerDistance;
-            
-            sliderHandle.style.left = currentX + 'px';
-            
-            const progress = currentX / triggerDistance;
-            
-            if (progress < 0.3) {
-                sliderFill.style.background = 'linear-gradient(90deg, #ff453a 0%, #ff375f 100%)';
-                sliderHandle.style.background = '#ff453a';
-                sliderText.textContent = "Тяните...";
-            } else if (progress < 0.7) {
-                sliderFill.style.background = 'linear-gradient(90deg, #ff9500 0%, #ff9f0a 100%)';
-                sliderHandle.style.background = '#ff9500';
-                sliderText.textContent = "Почти...";
-            } else {
-                sliderFill.style.background = 'linear-gradient(90deg, #32d74b 0%, #30d158 100%)';
-                sliderHandle.style.background = '#32d74b';
-                sliderText.textContent = "Отпустите!";
-            }
-            
-            if (progress > 0.8) {
-                sliderHandle.style.transform = 'scale(1.15)';
-            } else {
-                sliderHandle.style.transform = 'scale(1)';
-            }
-        }
-        
-        function endDrag(e) {
-            if (!isDragging || checkBlocked()) return;
-            e.preventDefault();
-            
-            isDragging = false;
-            
-            sliderHandle.style.transition = 'left 0.3s ease, background 0.3s ease, transform 0.3s ease';
-            sliderFill.style.transition = 'background 0.3s ease';
-            
-            if (currentX >= triggerDistance - 15) {
-                if (checkSpam()) {
-                    blockUser();
-                    status.textContent = "❌ Слишком часто! Заблокировано";
-                    status.className = "status error";
-                    sliderText.textContent = "❌ Заблокировано";
-                    sliderHandle.classList.add('shake-animation');
-                    setTimeout(() => {
-                        sliderHandle.classList.remove('shake-animation');
-                        resetSlider();
-                    }, 1000);
-                    return;
+        // === ИНИЦИАЛИЗАЦИЯ ===
+
+        function initEventListeners() {
+            // Слайдер события
+            sliderHandle.addEventListener('touchstart', startDrag, {passive: false});
+            document.addEventListener('touchmove', drag, {passive: false});
+            document.addEventListener('touchend', endDrag);
+            sliderHandle.addEventListener('mousedown', startDrag);
+            document.addEventListener('mousemove', drag);
+            document.addEventListener('mouseup', endDrag);
+
+            // Ввод кода события
+            codeInput.addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') {
+                    checkUnlockCode();
                 }
-                
-                addAttempt();
-                sliderHandle.style.left = triggerDistance + 'px';
-                sliderFill.style.background = 'linear-gradient(90deg, #32d74b 0%, #30d158 100%)';
-                sliderHandle.style.background = '#32d74b';
-                sliderText.textContent = "Отправка...";
-                status.textContent = "⏳ Отправка...";
-                
-                sendKnockNotification();
-            } else {
-                resetSlider();
-            }
-        }
-        
-        function resetSlider() {
-            sliderHandle.style.left = '0px';
-            sliderFill.style.background = '#2c2c2e';
-            sliderHandle.style.background = '#fff';
-            sliderHandle.style.color = '#32d74b';
-            sliderHandle.style.transform = 'scale(1)';
-            sliderText.textContent = "Потяните";
-            status.textContent = "Готов к работе";
-        }
-        
-        async function sendKnockNotification() {
-            try {
-                const response = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({
-                        chat_id: CHAT_ID,
-                        text: `🚪🚪🚪 УВЕДОМЛЕНИЕ О СТУКЕ 🚪🚪🚪
+            });
 
-👋 Кто-то постучал в вашу дверь!
+            codeInput.addEventListener('input', function(e) {
+                this.value = this.value.replace(/[^0-9]/g, '');
+                errorMessage.textContent = '';
+            });
 
-🆔 С устройства: ${deviceId}
-📱 Тип: ${getDeviceType()}
-⏰ Время: ${new Date().toLocaleTimeString()}
-📅 Дата: ${new Date().toLocaleDateString()}
-📈 Всего стуков: ${getKnockCount()}
-
-_Отправлено через Knock on my door v1.0.1_`,
-                        parse_mode: 'Markdown'
-                    })
-                });
-                
-                const result = await response.json();
-                
-                if (result.ok) {
-                    status.textContent = "✅ Уведомление отправлено!";
-                    status.className = "status success";
-                    sliderText.textContent = "✅ Отправлено!";
-                    
-                    sliderHandle.classList.add('success-animation');
-                    setTimeout(() => {
-                        sliderHandle.classList.remove('success-animation');
-                        setTimeout(resetSlider, 2000);
-                    }, 1000);
-                    
-                } else {
-                    status.textContent = "❌ Ошибка отправки";
-                    status.className = "status error";
-                    sliderText.textContent = "❌ Ошибка";
-                    setTimeout(resetSlider, 2000);
-                }
-            } catch (error) {
-                status.textContent = "❌ Ошибка сети";
-                status.className = "status error";
-                sliderText.textContent = "❌ Ошибка";
-                setTimeout(resetSlider, 2000);
-            }
+            // Ресайз
+            window.addEventListener('resize', initSizes);
+            
+            // Запрет контекстного меню
+            document.addEventListener('contextmenu', e => e.preventDefault());
         }
-        
-        // Инициализация при загрузке
+
+        // Запуск при загрузке
         window.addEventListener('load', function() {
-            if (checkBlocked()) {
-                return;
-            }
-            
+            initDatabase();
             deviceId = generateDeviceId();
             deviceIdElement.textContent = `ID: ${deviceId}`;
             updateAttemptsCounter();
             initSizes();
+            initEventListeners();
+            checkBlocked();
+            startBlockChecker();
+            
+            setInterval(updateAttemptsCounter, 60000);
         });
-        
-        window.addEventListener('resize', initSizes);
-        
-        // Запрет контекстного меню
-        document.addEventListener('contextmenu', e => e.preventDefault());
+
     </script>
 </body>
 </html>
