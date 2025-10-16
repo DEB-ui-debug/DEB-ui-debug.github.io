@@ -76,7 +76,7 @@
             width: 100%;
             height: 100%;
             background: rgba(0, 0, 0, 0.8);
-            display: flex;
+            display: none;
             flex-direction: column;
             align-items: center;
             justify-content: center;
@@ -137,7 +137,7 @@
             width: 100%;
             height: 100%;
             background: rgba(0, 0, 0, 0.95);
-            display: flex;
+            display: none;
             flex-direction: column;
             align-items: center;
             justify-content: center;
@@ -224,6 +224,7 @@
             font-weight: 600;
             margin-bottom: 5px;
             color: #fff;
+            text-align: center;
         }
         
         .app-subtitle {
@@ -231,6 +232,7 @@
             color: #8e8e93;
             margin-bottom: 10px;
             letter-spacing: 0.5px;
+            text-align: center;
         }
         
         .device-id {
@@ -241,19 +243,23 @@
             padding: 5px 10px;
             border-radius: 10px;
             font-family: 'Courier New', monospace;
+            text-align: center;
+            word-break: break-all;
         }
         
         .spam-warning {
             font-size: 11px;
-            color: #ff453a;
+            color: #32d74b;
             margin-bottom: 10px;
             opacity: 0.8;
+            text-align: center;
         }
         
         .instruction {
             font-size: 16px;
             color: #8e8e93;
             margin-bottom: 30px;
+            text-align: center;
         }
         
         .slider-container {
@@ -291,10 +297,11 @@
             cursor: grab;
             z-index: 10;
             box-shadow: 0 4px 15px rgba(0,0,0,0.3);
-            transition: left 0.3s ease, background 0.3s ease, transform 0.3s ease;
+            transition: left 0.1s ease, background 0.3s ease, transform 0.3s ease;
             font-size: 32px;
             font-weight: bold;
             touch-action: none;
+            color: #32d74b;
         }
         
         .slider-handle:active {
@@ -306,9 +313,10 @@
             position: absolute;
             height: 100%;
             background: #2c2c2e;
-            border-radius: 40px;
-            width: 100%;
-            transition: background 0.3s ease;
+            border-radius: 40px 0 0 40px;
+            width: 0%;
+            transition: width 0.1s ease, background 0.3s ease;
+            left: 0;
         }
         
         .slider-text {
@@ -331,10 +339,17 @@
             background: #2c2c2e;
             font-size: 16px;
             min-height: 20px;
+            text-align: center;
         }
         
-        .success { color: #32d74b; }
-        .error { color: #ff453a; }
+        .success { 
+            color: #32d74b;
+            background: rgba(50, 215, 75, 0.1);
+        }
+        .error { 
+            color: #ff453a;
+            background: rgba(255, 69, 58, 0.1);
+        }
         
         /* Анимация успеха */
         @keyframes success {
@@ -362,6 +377,7 @@
             font-size: 11px;
             color: #636366;
             opacity: 0.7;
+            text-align: center;
         }
 
         /* Адаптация для очень маленьких экранов */
@@ -415,7 +431,7 @@
     </div>
 
     <!-- Модальное окно "Что нового" -->
-    <div class="modal-overlay" id="whatsNewModal" style="display: none;">
+    <div class="modal-overlay" id="whatsNewModal">
         <div class="modal-content">
             <div class="modal-title">Что нового в v1.0.1</div>
             <div class="modal-text">
@@ -438,7 +454,7 @@
     </div>
 
     <!-- Окно блокировки -->
-    <div class="blocked-overlay" id="blockedOverlay" style="display: none;">
+    <div class="blocked-overlay" id="blockedOverlay">
         <div class="blocked-message">
             <div class="blocked-title">🚫 ЗАБЛОКИРОВАНО</div>
             <div class="blocked-text" id="blockedText">
@@ -456,7 +472,7 @@
     </div>
 
     <script>
-        // КОНСТАНТЫ - ВСТАВЬТЕ ВАШИ ДАННЫЕ ЗДЕСЬ
+        // КОНСТАНТЫ - ИСПРАВЛЕННЫЕ ДАННЫЕ
         const BOT_TOKEN = '8423545334:AAErDIfvBgLSegwZ7s0cEeFpmy8BhLYRFl0';
         const CHAT_ID = '8140407390';
         
@@ -481,14 +497,13 @@
         const handleWidth = 80;
         let triggerDistance = 0;
         let deviceId = '';
-        let blockCheckInterval = null;
         
         // Настройки
         const SPAM_SETTINGS = {
             maxAttempts: 20,
             timeWindow: 120000, // 2 минуты
             restoreTime: 600000, // 10 минут
-            blockDuration: 3600000, // 1 час
+            blockDuration: 300000, // 5 минут для теста
             cooldown: 2000
         };
 
@@ -523,41 +538,6 @@
             }
         }
 
-        // === СИСТЕМА БЛОКИРОВКИ ===
-
-        function isUserBlockedByDeveloper() {
-            try {
-                const users = JSON.parse(localStorage.getItem('knock_users_db') || '{}');
-                const userData = users[deviceId];
-                return !!(userData && userData.blocked && userData.isPermanentBan);
-            } catch (error) {
-                return false;
-            }
-        }
-
-        function applyDeveloperBlock() {
-            document.body.classList.add('blocked');
-            blockedText.innerHTML = `
-                🔥 Ну все доигрался ЭТО БАН!<br><br>
-                Тебя забанил разработчик!<br>
-                Все вопросы к нему.<br><br>
-                Разблокировка только через панель управления.
-            `;
-            blockedOverlay.style.display = 'flex';
-            status.textContent = "🚫 ЗАБАНЕН РАЗРАБОТЧИКОМ";
-            isDragging = false;
-            resetSlider();
-        }
-
-        function startBlockChecker() {
-            blockCheckInterval = setInterval(() => {
-                if (isUserBlockedByDeveloper()) {
-                    applyDeveloperBlock();
-                    clearInterval(blockCheckInterval);
-                }
-            }, 100);
-        }
-
         // === СИСТЕМА АНТИСПАМА ===
 
         function checkSpam() {
@@ -578,15 +558,13 @@
         function updateAttemptsCounter() {
             const now = Date.now();
             let attempts = JSON.parse(localStorage.getItem('knock_attempts') || '[]');
-            const validAttempts = attempts.filter(time => now - time < SPAM_SETTINGS.restoreTime);
             
-            if (validAttempts.length !== attempts.length) {
-                attempts = validAttempts;
-                localStorage.setItem('knock_attempts', JSON.stringify(attempts));
-            }
+            // Удаляем старые попытки
+            attempts = attempts.filter(time => now - time < SPAM_SETTINGS.restoreTime);
+            localStorage.setItem('knock_attempts', JSON.stringify(attempts));
             
             const recentAttempts = attempts.filter(time => now - time < SPAM_SETTINGS.timeWindow);
-            const remaining = SPAM_SETTINGS.maxAttempts - recentAttempts.length;
+            const remaining = Math.max(0, SPAM_SETTINGS.maxAttempts - recentAttempts.length);
             
             spamWarning.textContent = `Осталось попыток: ${remaining}`;
             
@@ -607,7 +585,6 @@
             localStorage.setItem('knock_block_until', blockUntil.toString());
             localStorage.setItem('knock_unlock_code', unlockCode);
             
-            document.body.classList.remove('blocked');
             blockedText.innerHTML = `
                 Привет, спамер!<br>
                 Система АНТИСПАМ тебя заблокировала!<br><br>
@@ -624,23 +601,17 @@
         }
 
         function checkBlocked() {
-            if (isUserBlockedByDeveloper()) {
-                applyDeveloperBlock();
-                return true;
-            }
-            
             const blocked = localStorage.getItem('knock_blocked');
             const blockUntil = localStorage.getItem('knock_block_until');
             
             if (blocked && blockUntil) {
                 const now = Date.now();
                 if (now < parseInt(blockUntil)) {
-                    document.body.classList.remove('blocked');
                     blockedText.innerHTML = `
                         Привет, спамер!<br>
                         Система АНТИСПАМ тебя заблокировала!<br><br>
                         Ты отправил слишком много уведомлений за 2 минуты.<br><br>
-                        Попроси у создателя код разблокировки:
+                        Разблокировка через: ${Math.ceil((parseInt(blockUntil) - now) / 60000)} мин.
                     `;
                     blockedOverlay.style.display = 'flex';
                     return true;
@@ -656,13 +627,10 @@
             localStorage.removeItem('knock_blocked');
             localStorage.removeItem('knock_block_until');
             localStorage.removeItem('knock_unlock_code');
-            localStorage.removeItem('knock_attempts');
             blockedOverlay.style.display = 'none';
             codeInput.value = '';
             errorMessage.textContent = '';
-            document.body.classList.remove('blocked');
             updateAttemptsCounter();
-            sendUnblockNotification();
         }
 
         function checkUnlockCode() {
@@ -671,6 +639,8 @@
             
             if (enteredCode === correctCode) {
                 unblockUser();
+                status.textContent = "✅ Успешно разблокировано!";
+                status.className = "status success";
             } else {
                 errorMessage.textContent = '❌ Неверный код! Попробуйте снова';
                 codeInput.value = '';
@@ -679,7 +649,6 @@
                 setTimeout(() => {
                     codeInput.classList.remove('shake-animation');
                 }, 500);
-                sendFailedUnlockAttempt(enteredCode);
             }
         }
 
@@ -693,13 +662,13 @@
 
         function resetSlider() {
             sliderHandle.style.left = '0px';
+            sliderFill.style.width = '0%';
             sliderFill.style.background = '#2c2c2e';
             sliderHandle.style.background = '#fff';
-            sliderHandle.style.color = '#32d74b';
-            sliderHandle.style.transform = 'scale(1)';
             sliderText.textContent = "Потяните";
             if (!checkBlocked()) {
                 status.textContent = "Готов к работе";
+                status.className = "status";
             }
         }
 
@@ -709,74 +678,58 @@
             e.preventDefault();
             isDragging = true;
             
-            const clientX = e.clientX || (e.touches && e.touches[0].clientX);
+            const clientX = e.type.includes('touch') ? e.touches[0].clientX : e.clientX;
             startX = clientX;
             
             sliderHandle.style.transition = 'none';
             sliderFill.style.transition = 'none';
-            status.textContent = "Тяните...";
         }
 
         function drag(e) {
             if (!isDragging || checkBlocked()) return;
-            e.preventDefault();
             
-            const clientX = e.clientX || (e.touches && e.touches[0].clientX);
-            if (!clientX) return;
-            
-            currentX = clientX - startX;
-            if (currentX < 0) currentX = 0;
-            if (currentX > triggerDistance) currentX = triggerDistance;
+            const clientX = e.type.includes('touch') ? e.touches[0].clientX : e.clientX;
+            currentX = Math.max(0, Math.min(clientX - startX, triggerDistance));
             
             sliderHandle.style.left = currentX + 'px';
             const progress = currentX / triggerDistance;
+            sliderFill.style.width = (progress * 100) + '%';
             
             if (progress < 0.3) {
-                sliderFill.style.background = 'linear-gradient(90deg, #ff453a 0%, #ff375f 100%)';
+                sliderFill.style.background = '#ff453a';
                 sliderHandle.style.background = '#ff453a';
                 sliderText.textContent = "Тяните...";
             } else if (progress < 0.7) {
-                sliderFill.style.background = 'linear-gradient(90deg, #ff9500 0%, #ff9f0a 100%)';
+                sliderFill.style.background = '#ff9500';
                 sliderHandle.style.background = '#ff9500';
                 sliderText.textContent = "Почти...";
             } else {
-                sliderFill.style.background = 'linear-gradient(90deg, #32d74b 0%, #30d158 100%)';
+                sliderFill.style.background = '#32d74b';
                 sliderHandle.style.background = '#32d74b';
                 sliderText.textContent = "Отпустите!";
-            }
-            
-            if (progress > 0.8) {
-                sliderHandle.style.transform = 'scale(1.15)';
-            } else {
-                sliderHandle.style.transform = 'scale(1)';
             }
         }
 
         function endDrag(e) {
             if (!isDragging || checkBlocked()) return;
-            e.preventDefault();
             
             isDragging = false;
-            sliderHandle.style.transition = 'left 0.3s ease, background 0.3s ease, transform 0.3s ease';
-            sliderFill.style.transition = 'background 0.3s ease';
+            sliderHandle.style.transition = 'left 0.3s ease, background 0.3s ease';
+            sliderFill.style.transition = 'width 0.3s ease, background 0.3s ease';
             
-            if (currentX >= triggerDistance - 15) {
+            if (currentX >= triggerDistance - 10) {
                 if (checkSpam()) {
                     blockUserForSpam();
                     status.textContent = "❌ Слишком часто! Заблокировано";
                     status.className = "status error";
-                    sliderText.textContent = "❌ Заблокировано";
-                    sliderHandle.classList.add('shake-animation');
-                    setTimeout(() => {
-                        sliderHandle.classList.remove('shake-animation');
-                        resetSlider();
-                    }, 1000);
+                    setTimeout(resetSlider, 1000);
                     return;
                 }
                 
                 addAttempt();
                 sliderHandle.style.left = triggerDistance + 'px';
-                sliderFill.style.background = 'linear-gradient(90deg, #32d74b 0%, #30d158 100%)';
+                sliderFill.style.width = '100%';
+                sliderFill.style.background = '#32d74b';
                 sliderHandle.style.background = '#32d74b';
                 sliderText.textContent = "Отправка...";
                 status.textContent = "⏳ Отправка...";
@@ -797,40 +750,40 @@
                     headers: {'Content-Type': 'application/json'},
                     body: JSON.stringify({
                         chat_id: CHAT_ID,
-                        text: `🚪🚪🚪 УВЕДОМЛЕНИЕ О СТУКЕ 🚪🚪🚪
+                        text: `🚪 КТО-ТО ПОСТУЧАЛ В ДВЕРЬ!
 
-👋 Кто-то постучал в вашу дверь!
+👋 Твой друг постучал в дверь!
 
-🆔 С устройства: ${deviceId}
-📱 Тип: ${getDeviceType()}
+📱 Устройство: ${getDeviceType()}
 ⏰ Время: ${new Date().toLocaleTimeString()}
 📅 Дата: ${new Date().toLocaleDateString()}
-📈 Всего стуков: ${knockCount}
+📊 Всего стуков: ${knockCount}
 
-_Отправлено через Knock on my door v1.0.1_`,
-                        parse_mode: 'Markdown'
+_Knock on my door v1.0.1_`
                     })
                 });
                 
-                const result = await response.json();
-                
-                if (result.ok) {
-                    status.textContent = "✅ Уведомление отправлено!";
-                    status.className = "status success";
-                    sliderText.textContent = "✅ Отправлено!";
-                    
-                    sliderHandle.classList.add('success-animation');
-                    setTimeout(() => {
-                        sliderHandle.classList.remove('success-animation');
-                        setTimeout(resetSlider, 2000);
-                    }, 1000);
-                    
+                if (response.ok) {
+                    const result = await response.json();
+                    if (result.ok) {
+                        status.textContent = "✅ Уведомление отправлено!";
+                        status.className = "status success";
+                        sliderText.textContent = "✅ Отправлено!";
+                        
+                        sliderHandle.classList.add('success-animation');
+                        setTimeout(() => {
+                            sliderHandle.classList.remove('success-animation');
+                            setTimeout(resetSlider, 1000);
+                        }, 1000);
+                    } else {
+                        throw new Error('Telegram API error');
+                    }
                 } else {
-                    throw new Error('Telegram API error: ' + (result.description || 'Unknown error'));
+                    throw new Error('Network error');
                 }
             } catch (error) {
                 console.error('Ошибка отправки:', error);
-                status.textContent = "❌ Ошибка отправки: " + error.message;
+                status.textContent = "❌ Ошибка отправки";
                 status.className = "status error";
                 sliderText.textContent = "❌ Ошибка";
                 setTimeout(resetSlider, 2000);
@@ -849,86 +802,12 @@ _Отправлено через Knock on my door v1.0.1_`,
 🆔 ID устройства: ${deviceId}
 📱 Тип: ${getDeviceType()}
 🔒 Код разблокировки: ${unlockCode}
-⏰ Заблокирован до: ${new Date(Date.now() + SPAM_SETTINGS.blockDuration).toLocaleString()}
-📊 Отправлено уведомлений: ${SPAM_SETTINGS.maxAttempts} за 2 минуты
-
-_Протокол МПБ: Заблокировано за спам_`,
-                        parse_mode: 'Markdown'
+⏰ Заблокирован на: 5 минут
+📊 Причина: ${SPAM_SETTINGS.maxAttempts} попыток за 2 минуты`
                     })
                 });
             } catch (error) {
-                console.log('Ошибка отправки уведомления о блокировке:', error);
-            }
-        }
-
-        async function sendUnblockNotification() {
-            try {
-                await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({
-                        chat_id: CHAT_ID,
-                        text: `✅ УСТРОЙСТВО РАЗБЛОКИРОВАНО
-
-🆔 ID устройства: ${deviceId}
-📱 Тип: ${getDeviceType()}
-⏰ Время разблокировки: ${new Date().toLocaleString()}
-🛡️ Протокол: МПБ
-
-_Пользователь ввел правильный код_`,
-                        parse_mode: 'Markdown'
-                    })
-                });
-            } catch (error) {
-                console.log('Ошибка отправки уведомления о разблокировке:', error);
-            }
-        }
-
-        async function sendFailedUnlockAttempt(enteredCode) {
-            try {
-                await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({
-                        chat_id: CHAT_ID,
-                        text: `⚠️ НЕУДАЧНАЯ ПОПЫТКА РАЗБЛОКИРОВКИ
-
-🆔 ID устройства: ${deviceId}
-📱 Тип: ${getDeviceType()}
-❌ Введен код: ${enteredCode}
-✅ Правильный код: ${localStorage.getItem('knock_unlock_code')}
-⏰ Время попытки: ${new Date().toLocaleString()}
-🛡️ Протокол: МПБ
-
-_Кто-то пытается угадать код!_`,
-                        parse_mode: 'Markdown'
-                    })
-                });
-            } catch (error) {
-                console.log('Ошибка отправки уведомления о неудачной попытке:', error);
-            }
-        }
-
-        async function sendNewDeviceNotification(deviceId) {
-            try {
-                await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({
-                        chat_id: CHAT_ID,
-                        text: `📱 НОВОЕ УСТРОЙСТВО
-
-🆔 ID: ${deviceId}
-📱 Тип: ${getDeviceType()}
-⏰ Время: ${new Date().toLocaleString()}
-📍 Источник: Knock App
-
-_Новое устройство зарегистрировано в системе_`,
-                        parse_mode: 'Markdown'
-                    })
-                });
-            } catch (error) {
-                console.log('Ошибка отправки уведомления о новом устройстве:', error);
+                console.log('Ошибка отправки уведомления о блокировке');
             }
         }
 
@@ -939,35 +818,16 @@ _Новое устройство зарегистрировано в систе�
             if (!id) {
                 id = 'DEV_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
                 localStorage.setItem('knock_device_id', id);
-                sendNewDeviceNotification(id);
-                
-                const users = JSON.parse(localStorage.getItem('knock_users_db') || '{}');
-                if (!users[id]) {
-                    users[id] = {
-                        registered: Date.now(),
-                        knockCount: 0,
-                        deviceType: getDeviceType(),
-                        lastActivity: Date.now()
-                    };
-                    localStorage.setItem('knock_users_db', JSON.stringify(users));
-                }
             }
             return id;
         }
 
         function getKnockCount() {
-            let count = localStorage.getItem('knock_count');
-            if (!count) count = 0;
-            count = parseInt(count) + 1;
-            localStorage.setItem('knock_count', count);
-            
-            const users = JSON.parse(localStorage.getItem('knock_users_db') || '{}');
-            if (users[deviceId]) {
-                users[deviceId].knockCount = (users[deviceId].knockCount || 0) + 1;
-                users[deviceId].lastActivity = Date.now();
-                localStorage.setItem('knock_users_db', JSON.stringify(users));
-            }
-            
+            const today = new Date().toDateString();
+            const storageKey = 'knock_count_' + today;
+            let count = parseInt(localStorage.getItem(storageKey) || '0');
+            count++;
+            localStorage.setItem(storageKey, count.toString());
             return count;
         }
 
@@ -978,6 +838,7 @@ _Новое устройство зарегистрировано в систе�
             sliderHandle.addEventListener('touchstart', startDrag, {passive: false});
             document.addEventListener('touchmove', drag, {passive: false});
             document.addEventListener('touchend', endDrag);
+            
             sliderHandle.addEventListener('mousedown', startDrag);
             document.addEventListener('mousemove', drag);
             document.addEventListener('mouseup', endDrag);
@@ -996,9 +857,6 @@ _Новое устройство зарегистрировано в систе�
 
             // Ресайз
             window.addEventListener('resize', initSizes);
-            
-            // Запрет контекстного меню
-            document.addEventListener('contextmenu', e => e.preventDefault());
         }
 
         // Запуск при загрузке
@@ -1010,9 +868,8 @@ _Новое устройство зарегистрировано в систе�
             initSizes();
             initEventListeners();
             checkBlocked();
-            startBlockChecker();
             
-            setInterval(updateAttemptsCounter, 60000);
+            setInterval(updateAttemptsCounter, 10000);
         });
 
     </script>
