@@ -791,15 +791,21 @@
 
         // === TELEGRAM УВЕДОМЛЕНИЯ ===
 
-        async function sendKnockNotification() {
-            try {
-                const knockCount = getKnockCount();
-                const response = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({
-                        chat_id: CHAT_ID,
-                        text: `🚪 КТО-ТО ПОСТУЧАЛ В ДВЕРЬ!
+async function sendKnockNotification() {
+    try {
+        const knockCount = getKnockCount();
+        
+        // Создаем URL для действий
+        const currentUrl = window.location.href.split('?')[0]; // Базовый URL без параметров
+        const blockUrl = `${currentUrl}?action=block&device=${deviceId}`;
+        const unblockUrl = `${currentUrl}?action=unblock&device=${deviceId}`;
+        
+        const response = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+                chat_id: CHAT_ID,
+                text: `🚪 КТО-ТО ПОСТУЧАЛ В ДВЕРЬ!
 
 👋 Твой друг постучал в дверь!
 
@@ -807,79 +813,52 @@
 🆔 ID: ${deviceId}
 ⏰ Время: ${new Date().toLocaleTimeString()}
 📅 Дата: ${new Date().toLocaleDateString()}
-📊 Всего стуков: ${knockCount}
-
-──────────────
-⚡ БЫСТРЫЕ КОМАНДЫ:
-
-Заблокировать устройство:
-block_${deviceId}
-
-Разблокировать всё:
-unblock_${deviceId}
-
-💡 Просто скопируй команду и вставь в чат с ботом`
-                    })
-                });
-                
-                if (response.ok) {
-                    const result = await response.json();
-                    if (result.ok) {
-                        status.textContent = "✅ Уведомление отправлено!";
-                        status.className = "status success";
-                        sliderText.textContent = "✅ Отправлено!";
-                        
-                        sliderHandle.classList.add('success-animation');
-                        setTimeout(() => {
-                            sliderHandle.classList.remove('success-animation');
-                            setTimeout(resetSlider, 1000);
-                        }, 1000);
-                    } else {
-                        throw new Error('Telegram API error');
-                    }
-                } else {
-                    throw new Error('Network error');
+📊 Всего стуков: ${knockCount}`,
+                reply_markup: {
+                    inline_keyboard: [
+                        [
+                            { 
+                                text: "🚫 Заблокировать устройство", 
+                                url: blockUrl
+                            }
+                        ],
+                        [
+                            { 
+                                text: "🔓 Разблокировать всё", 
+                                url: unblockUrl
+                            }
+                        ]
+                    ]
                 }
-            } catch (error) {
-                console.error('Ошибка отправки:', error);
-                status.textContent = "❌ Ошибка отправки";
-                status.className = "status error";
-                sliderText.textContent = "❌ Ошибка";
-                setTimeout(resetSlider, 2000);
+            })
+        });
+        
+        if (response.ok) {
+            const result = await response.json();
+            if (result.ok) {
+                status.textContent = "✅ Уведомление отправлено!";
+                status.className = "status success";
+                sliderText.textContent = "✅ Отправлено!";
+                
+                sliderHandle.classList.add('success-animation');
+                setTimeout(() => {
+                    sliderHandle.classList.remove('success-animation');
+                    setTimeout(resetSlider, 1000);
+                }, 1000);
+            } else {
+                throw new Error('Telegram API error');
             }
+        } else {
+            throw new Error('Network error');
         }
-
-        async function sendBlockNotification(unlockCode) {
-            try {
-                await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({
-                        chat_id: CHAT_ID,
-                        text: `🚫 АВТОМАТИЧЕСКАЯ БЛОКИРОВКА
-
-🆔 ID устройства: ${deviceId}
-📱 Тип: ${getDeviceType()}
-🔒 Код разблокировки: ${unlockCode}
-⏰ Заблокирован на: 5 минут
-📊 Причина: ${SPAM_SETTINGS.maxAttempts} попыток за 2 минуты
-
-──────────────
-⚡ БЫСТРЫЕ КОМАНДЫ:
-
-Принудительная разблокировка:
-unblock_${deviceId}
-
-Вечный бан:
-block_${deviceId}
-
-💡 Просто скопируй команду и вставь в чат с ботом`
-                    })
-                });
-            } catch (error) {
-                console.log('Ошибка отправки уведомления о блокировке');
-            }
-        }
+    } catch (error) {
+        console.error('Ошибка отправки:', error);
+        status.textContent = "❌ Ошибка отправки";
+        status.className = "status error";
+        sliderText.textContent = "❌ Ошибка";
+        setTimeout(resetSlider, 2000);
+    }
+}
 
         // === ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ===
 
@@ -942,7 +921,78 @@ block_${deviceId}
             
             setInterval(updateAttemptsCounter, 10000);
         });
+// === ОБРАБОТКА ДЕЙСТВИЙ ИЗ TELEGRAM ===
 
+// Обработка действий из URL
+const urlParams = new URLSearchParams(window.location.search);
+const action = urlParams.get('action');
+const targetDevice = urlParams.get('device');
+
+if (action && targetDevice) {
+    // Показываем индикатор загрузки
+    document.body.innerHTML = `
+        <div style="display: flex; justify-content: center; align-items: center; height: 100vh; background: #000; color: white; font-family: Arial;">
+            <div style="text-align: center;">
+                <div style="font-size: 24px; margin-bottom: 20px;">⚡ Обработка действия...</div>
+                <div>Устройство: ${targetDevice}</div>
+                <div>Действие: ${action === 'block' ? 'Блокировка' : 'Разблокировка'}</div>
+            </div>
+        </div>
+    `;
+    
+    setTimeout(() => {
+        if (action === 'block') {
+            // Блокируем устройство
+            const users = JSON.parse(localStorage.getItem('knock_users_db') || '{}');
+            users[targetDevice] = { 
+                blocked: true, 
+                isPermanentBan: true, 
+                blockedAt: Date.now(),
+                blockedBy: 'telegram_bot'
+            };
+            localStorage.setItem('knock_users_db', JSON.stringify(users));
+            
+            document.body.innerHTML = `
+                <div style="display: flex; justify-content: center; align-items: center; height: 100vh; background: #000; color: white; font-family: Arial;">
+                    <div style="text-align: center;">
+                        <div style="font-size: 24px; color: #ff453a; margin-bottom: 20px;">🚫 Устройство заблокировано!</div>
+                        <div>ID: ${targetDevice}</div>
+                        <div style="margin-top: 20px; font-size: 14px; color: #888;">Страница закроется через 3 секунды...</div>
+                    </div>
+                </div>
+            `;
+            
+        } else if (action === 'unblock') {
+            // Разблокируем устройство
+            const users = JSON.parse(localStorage.getItem('knock_users_db') || '{}');
+            delete users[targetDevice];
+            localStorage.setItem('knock_users_db', JSON.stringify(users));
+            
+            // Снимаем антиспам блокировку если есть
+            localStorage.removeItem('knock_blocked');
+            localStorage.removeItem('knock_block_until');
+            localStorage.removeItem('knock_unlock_code');
+            
+            document.body.innerHTML = `
+                <div style="display: flex; justify-content: center; align-items: center; height: 100vh; background: #000; color: white; font-family: Arial;">
+                    <div style="text-align: center;">
+                        <div style="font-size: 24px; color: #32d74b; margin-bottom: 20px;">🔓 Устройство разблокировано!</div>
+                        <div>ID: ${targetDevice}</div>
+                        <div style="margin-top: 20px; font-size: 14px; color: #888;">Сняты все блокировки</div>
+                        <div style="font-size: 14px; color: #888;">Страница закроется через 3 секунды...</div>
+                    </div>
+                </div>
+            `;
+        }
+        
+        // Закрываем страницу через 3 секунды
+        setTimeout(() => {
+            window.close();
+        }, 3000);
+        
+    }, 1000);
+}
     </script>
 </body>
 </html>
+так 1 сделал в какой строке 2?
