@@ -903,14 +903,19 @@ async function sendBlockNotification(unlockCode) {
 
 // === ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ===
     
-        function generateDeviceId() {
-            let id = localStorage.getItem('knock_device_id');
-            if (!id) {
-                id = 'DEV_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
-                localStorage.setItem('knock_device_id', id);
-            }
-            return id;
-        }
+function generateDeviceId() {
+    let id = localStorage.getItem('knock_device_id');
+    if (!id) {
+        // Более надежная генерация ID
+        const timestamp = Date.now().toString(36);
+        const random = Math.random().toString(36).substr(2, 9);
+        const performanceMark = performance.now().toString(36).replace('.', '');
+      id = 'DEV_' + timestamp + '_' + random + '_' + performanceMark;  
+    
+        localStorage.setItem('knock_device_id', id);
+    }
+    return id;
+}      
 
         function getKnockCount() {
             const today = new Date().toDateString();
@@ -950,18 +955,24 @@ async function sendBlockNotification(unlockCode) {
         }
 
         // Запуск при загрузке
-        window.addEventListener('load', function() {
-            initDatabase();
-            deviceId = generateDeviceId();
-            deviceIdElement.textContent = `ID: ${deviceId}`;
-            updateAttemptsCounter();
-            initSizes();
-            initEventListeners();
-            checkBlocked();
-            startBlockChecker();
-            
-            setInterval(updateAttemptsCounter, 10000);
-        });
+     window.addEventListener('load', function() {
+    initDatabase();
+    
+    // Добавьте небольшую задержку для гарантированной генерации ID
+    setTimeout(() => {
+        deviceId = generateDeviceId();
+        deviceIdElement.textContent = `ID: ${deviceId}`;
+        console.log('Device ID generated:', deviceId); // Для отладки
+    }, 100);
+    
+    updateAttemptsCounter();
+    initSizes();
+    initEventListeners();
+    checkBlocked();
+    startBlockChecker();
+    
+    setInterval(updateAttemptsCounter, 10000);
+});
 // === ОБРАБОТКА ДЕЙСТВИЙ ИЗ TELEGRAM ===
 
 // Обработка действий из URL
