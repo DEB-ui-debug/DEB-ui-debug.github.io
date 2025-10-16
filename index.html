@@ -471,8 +471,23 @@
         </div>
     </div>
 
+    <!-- Окно блокировки администратором -->
+    <div class="blocked-overlay" id="adminBlockOverlay" style="display: none;">
+        <div class="blocked-message">
+            <div class="blocked-title">🔥 ЗАБАНИЛ АДМИН</div>
+            <div class="blocked-text">
+                Привет, ты забанен админчиком!<br><br>
+                Все вопросы к нему.<br>
+                Разблокировка только через панель управления.
+            </div>
+            <div style="margin-top: 20px; font-size: 12px; color: rgba(255,255,255,0.7);">
+                ID устройства: <span id="bannedDeviceId"></span>
+            </div>
+        </div>
+    </div>
+
     <script>
-        // КОНСТАНТЫ - ИСПРАВЛЕННЫЕ ДАННЫЕ
+        // КОНСТАНТЫ
         const BOT_TOKEN = '8423545334:AAErDIfvBgLSegwZ7s0cEeFpmy8BhLYRFl0';
         const CHAT_ID = '8140407390';
         
@@ -488,6 +503,8 @@
         const codeInput = document.getElementById('codeInput');
         const errorMessage = document.getElementById('errorMessage');
         const whatsNewModal = document.getElementById('whatsNewModal');
+        const adminBlockOverlay = document.getElementById('adminBlockOverlay');
+        const bannedDeviceId = document.getElementById('bannedDeviceId');
         
         // Переменные
         let isDragging = false;
@@ -501,9 +518,9 @@
         // Настройки
         const SPAM_SETTINGS = {
             maxAttempts: 20,
-            timeWindow: 120000, // 2 минуты
-            restoreTime: 600000, // 10 минут
-            blockDuration: 300000, // 5 минут для теста
+            timeWindow: 120000,
+            restoreTime: 600000,
+            blockDuration: 300000,
             cooldown: 2000
         };
 
@@ -538,6 +555,35 @@
             }
         }
 
+        // === СИСТЕМА БЛОКИРОВКИ ===
+
+        function isUserBlockedByDeveloper() {
+            try {
+                const users = JSON.parse(localStorage.getItem('knock_users_db') || '{}');
+                const userData = users[deviceId];
+                return !!(userData && userData.blocked && userData.isPermanentBan);
+            } catch (error) {
+                return false;
+            }
+        }
+
+        function applyDeveloperBlock() {
+            document.body.classList.add('blocked');
+            adminBlockOverlay.style.display = 'flex';
+            bannedDeviceId.textContent = deviceId;
+            status.textContent = "🚫 ЗАБАНЕН АДМИНИСТРАТОРОМ";
+            isDragging = false;
+            resetSlider();
+        }
+
+        function startBlockChecker() {
+            setInterval(() => {
+                if (isUserBlockedByDeveloper()) {
+                    applyDeveloperBlock();
+                }
+            }, 1000);
+        }
+
         // === СИСТЕМА АНТИСПАМА ===
 
         function checkSpam() {
@@ -558,8 +604,6 @@
         function updateAttemptsCounter() {
             const now = Date.now();
             let attempts = JSON.parse(localStorage.getItem('knock_attempts') || '[]');
-            
-            // Удаляем старые попытки
             attempts = attempts.filter(time => now - time < SPAM_SETTINGS.restoreTime);
             localStorage.setItem('knock_attempts', JSON.stringify(attempts));
             
@@ -601,6 +645,11 @@
         }
 
         function checkBlocked() {
+            if (isUserBlockedByDeveloper()) {
+                applyDeveloperBlock();
+                return true;
+            }
+            
             const blocked = localStorage.getItem('knock_blocked');
             const blockUntil = localStorage.getItem('knock_block_until');
             
@@ -755,11 +804,21 @@
 👋 Твой друг постучал в дверь!
 
 📱 Устройство: ${getDeviceType()}
+🆔 ID: ${deviceId}
 ⏰ Время: ${new Date().toLocaleTimeString()}
 📅 Дата: ${new Date().toLocaleDateString()}
 📊 Всего стуков: ${knockCount}
 
-_Knock on my door v1.0.1_`
+──────────────
+⚡ БЫСТРЫЕ КОМАНДЫ:
+
+Заблокировать устройство:
+block_${deviceId}
+
+Разблокировать всё:
+unblock_${deviceId}
+
+💡 Просто скопируй команду и вставь в чат с ботом`
                     })
                 });
                 
@@ -803,7 +862,18 @@ _Knock on my door v1.0.1_`
 📱 Тип: ${getDeviceType()}
 🔒 Код разблокировки: ${unlockCode}
 ⏰ Заблокирован на: 5 минут
-📊 Причина: ${SPAM_SETTINGS.maxAttempts} попыток за 2 минуты`
+📊 Причина: ${SPAM_SETTINGS.maxAttempts} попыток за 2 минуты
+
+──────────────
+⚡ БЫСТРЫЕ КОМАНДЫ:
+
+Принудительная разблокировка:
+unblock_${deviceId}
+
+Вечный бан:
+block_${deviceId}
+
+💡 Просто скопируй команду и вставь в чат с ботом`
                     })
                 });
             } catch (error) {
@@ -868,6 +938,7 @@ _Knock on my door v1.0.1_`
             initSizes();
             initEventListeners();
             checkBlocked();
+            startBlockChecker();
             
             setInterval(updateAttemptsCounter, 10000);
         });
